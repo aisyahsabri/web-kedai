@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ops Banteras: Polis vs Penjahat</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Tone.js for Sound Effects -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@600;700&display=swap');
+
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+            background-color: #0b0f19;
+            color: #ffffff;
+            overflow: hidden;
+        }
+
+        .pixel-font {
+            font-family: 'Press Start 2P', cursive;
+        }
+
+        /* Canvas styling */
+        #gameCanvas {
+            background: #111827;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+            border-radius: 12px;
+        }
+
+        /* Police Siren Flash Effects */
+        @keyframes redBlueFlash {
+            0% { box-shadow: 0 0 25px rgba(239, 68, 68, 0.6); }
+            50% { box-shadow: 0 0 25px rgba(59, 130, 246, 0.6); }
+            100% { box-shadow: 0 0 25px rgba(239, 68, 68, 0.6); }
+        }
+
+        .siren-border {
+            animation: redBlueFlash 1.5s infinite;
+        }
+
+        /* Custom Scrollbar for Briefing */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3b82f6;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-between items-center p-2 sm:p-4 bg-slate-950 text-white">
+
+    <!-- Header HUD -->
+    <header class="w-full max-w-4xl flex justify-between items-center bg-slate-900/90 border border-slate-800 rounded-xl p-3 px-4 backdrop-blur-md z-10 siren-border">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-blue-600/20 border border-blue-500 flex items-center justify-center text-blue-400 text-xl font-bold">
+                <i class="fa-solid => fa-shield-halved"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold tracking-wider text-blue-400 uppercase leading-none">Ops Banteras</h1>
+                <span id="rankBadge" class="text-xs text-amber-400 font-semibold">Pangkat: Konstabel</span>
+            </div>
+        </div>
+
+        <!-- Dynamic Game Stats -->
+        <div class="flex items-center gap-4 sm:gap-6 text-sm sm:text-base">
+            <div class="text-center">
+                <div class="text-xs text-slate-400 uppercase">Mata (XP)</div>
+                <div id="scoreDisplay" class="font-mono font-bold text-emerald-400 text-lg">0</div>
+            </div>
+            <div class="text-center">
+                <div class="text-xs text-slate-400 uppercase">Tangkapan</div>
+                <div id="catchesDisplay" class="font-mono font-bold text-blue-400 text-lg">0/5</div>
+            </div>
+            <div class="text-center">
+                <div class="text-xs text-slate-400 uppercase">Masa</div>
+                <div id="timeDisplay" class="font-mono font-bold text-rose-400 text-lg">60s</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Game Area Container -->
+    <main class="relative w-full max-w-4xl flex-1 my-2 flex items-center justify-center overflow-hidden">
+        
+        <!-- Game Canvas -->
+        <canvas id="gameCanvas" class="w-full h-full object-contain"></canvas>
+
+        <!-- Overlay UI: Start / Case Selection Screen -->
+        <div id="startOverlay" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md rounded-xl flex flex-col justify-center items-center p-6 text-center z-20">
+            <div class="w-16 h-16 bg-blue-600/30 border-2 border-blue-500 rounded-full flex items-center justify-center text-3xl text-blue-400 mb-3 animate-pulse">
+                <i class="fa-solid fa-user-ninja"></i>
+            </div>
+            <h2 class="text-2xl sm:text-3xl font-black text-white uppercase tracking-wide mb-1">Pilih Kes Jenayah</h2>
+            <p class="text-slate-400 text-xs sm:text-sm mb-6 max-w-md">Sertai unit khas polis untuk membanteras pelbagai kes jenayah di bandar. Tangkap penjahat sebelum masa tamat!</p>
+
+            <!-- Case Selection List -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl mb-6">
+                <!-- Case 1 -->
+                <button onclick="selectCase(0)" class="case-btn border border-slate-700 bg-slate-900/80 hover:bg-blue-900/40 hover:border-blue-500 p-3 rounded-lg text-left transition duration-200 flex items-center gap-3 group">
+                    <div class="p-3 bg-amber-500/10 rounded-lg text-amber-400 group-hover:scale-110 transition"><i class="fa-solid fa-person-walking-luggage text-xl"></i></div>
+                    <div>
+                        <div class="font-bold text-sm text-slate-200 group-hover:text-blue-400">Kes 1: Ragut Beg Tangan</div>
+                        <div class="text-xs text-slate-400">Kelajuan: Perlahan | Sasaran: 5 Penjahat</div>
+                    </div>
+                </button>
+                <!-- Case 2 -->
+                <button onclick="selectCase(1)" class="case-btn border border-slate-700 bg-slate-900/80 hover:bg-rose-900/40 hover:border-rose-500 p-3 rounded-lg text-left transition duration-200 flex items-center gap-3 group">
+                    <div class="p-3 bg-rose-500/10 rounded-lg text-rose-400 group-hover:scale-110 transition"><i class="fa-solid fa-vault text-xl"></i></div>
+                    <div>
+                        <div class="font-bold text-sm text-slate-200 group-hover:text-rose-400">Kes 2: Rompakan Bank</div>
+                        <div class="text-xs text-slate-400">Kelajuan: Sederhana | Sasaran: 7 Penjahat</div>
+                    </div>
+                </button>
+                <!-- Case 3 -->
+                <button onclick="selectCase(2)" class="case-btn border border-slate-700 bg-slate-900/80 hover:bg-purple-900/40 hover:border-purple-500 p-3 rounded-lg text-left transition duration-200 flex items-center gap-3 group">
+                    <div class="p-3 bg-purple-500/10 rounded-lg text-purple-400 group-hover:scale-110 transition"><i class="fa-solid fa-laptop-code text-xl"></i></div>
+                    <div>
+                        <div class="font-bold text-sm text-slate-200 group-hover:text-purple-400">Kes 3: Jenayah Siber</div>
+                        <div class="text-xs text-slate-400">Kelajuan: Pantas | Sasaran: 10 Penjahat</div>
+                    </div>
+                </button>
+                <!-- Case 4 -->
+                <button onclick="selectCase(3)" class="case-btn border border-slate-700 bg-slate-900/80 hover:bg-emerald-900/40 hover:border-emerald-500 p-3 rounded-lg text-left transition duration-200 flex items-center gap-3 group">
+                    <div class="p-3 bg-emerald-500/10 rounded-lg text-emerald-400 group-hover:scale-110 transition"><i class="fa-solid fa-box-open text-xl"></i></div>
+                    <div>
+                        <div class="font-bold text-sm text-slate-200 group-hover:text-emerald-400">Kes 4: Seludup Haram</div>
+                        <div class="text-xs text-slate-400">Kelajuan: Sangat Pantas | Sasaran: 12 Penjahat</div>
+                    </div>
+                </button>
+            </div>
+
+            <button id="startBtn" onclick="startGame()" class="px-8 py-3 bg-blue-600 hover:bg-blue-500 font-bold rounded-lg shadow-lg shadow-blue-600/40 transition transform hover:-translate-y-0.5 active:translate-y-0 text-sm uppercase tracking-wider">
+                Mula Misi
+            </button>
+        </div>
+
+        <!-- Overlay UI: Game Over / Mission Accomplished Screen -->
+        <div id="endOverlay" class="hidden absolute inset-0 bg-slate-950/95 backdrop-blur-md rounded-xl flex flex-col justify-center items-center p-6 text-center z-20">
+            <div id="endIcon" class="w-20 h-20 rounded-full flex items-center justify-center text-4xl mb-4 border-2"></div>
+            <h2 id="endTitle" class="text-3xl font-black mb-2 uppercase"></h2>
+            <p id="endDesc" class="text-slate-300 text-sm mb-6 max-w-md"></p>
+            
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl w-full max-w-xs mb-6 space-y-2 text-left">
+                <div class="flex justify-between text-xs text-slate-400">
+                    <span>Jumlah Mata:</span>
+                    <span id="finalScore" class="font-mono text-white font-bold">0</span>
+                </div>
+                <div class="flex justify-between text-xs text-slate-400">
+                    <span>Penjahat Ditangkap:</span>
+                    <span id="finalCatches" class="font-mono text-white font-bold">0</span>
+                </div>
+                <div class="flex justify-between text-xs text-slate-400">
+                    <span>Gred Pegawai:</span>
+                    <span id="finalRank" class="font-mono text-amber-400 font-bold">Konstabel</span>
+                </div>
+            </div>
+
+            <button onclick="resetToMenu()" class="px-8 py-3 bg-blue-600 hover:bg-blue-500 font-bold rounded-lg shadow-lg transition text-sm uppercase tracking-wider">
+                Kembali Ke Senarai Kes
+            </button>
+        </div>
+    </main>
+
+    <!-- Mobile Touch Controls & Instructions Footer -->
+    <footer class="w-full max-w-4xl bg-slate-900/90 border border-slate-800 rounded-xl p-3 backdrop-blur-md z-10 flex flex-col md:flex-row items-center justify-between gap-3">
+        
+        <!-- Controls Explanation (Desktop) -->
+        <div class="hidden md:flex items-center gap-4 text-xs text-slate-400">
+            <span class="flex items-center gap-1"><kbd class="px-2 py-1 bg-slate-800 rounded border border-slate-700 text-slate-200">WASD</kbd> / <kbd class="px-2 py-1 bg-slate-800 rounded border border-slate-700 text-slate-200">←↑↓→</kbd> Gerak Polis</span>
+            <span class="flex items-center gap-1"><kbd class="px-2 py-1 bg-slate-800 rounded border border-slate-700 text-slate-200">SPACE</kbd> Gari / Taser</span>
+            <span class="flex items-center gap-1"><kbd class="px-2 py-1 bg-slate-800 rounded border border-slate-700 text-slate-200">SHIFT</kbd> Lari Depan (Sprint)</span>
+        </div>
+
+        <!-- Touch Controls for Mobile Devices -->
+        <div class="w-full md:hidden flex justify-between items-center gap-2">
+            <!-- D-Pad Control -->
+            <div class="grid grid-cols-3 gap-1 w-32 h-32">
+                <div></div>
+                <button id="btnUp" class="bg-slate-800 border border-slate-700 rounded-lg flex items-center justify-center active:bg-blue-600 text-slate-200"><i class="fa-solid fa-chevron-up"></i></button>
+                <div></div>
+                <button id="btnLeft" class="bg-slate-800 border border-slate-700 rounded-lg flex items-center justify-center active:bg-blue-600 text-slate-200"><i class="fa-solid fa-chevron-left"></i></button>
+                <div class="bg-slate-950/50 rounded-lg flex items-center justify-center text-xs text-slate-600"><i class="fa-solid fa-gamepad"></i></div>
+                <button id="btnRight" class="bg-slate-800 border border-slate-700 rounded-lg flex items-center justify-center active:bg-blue-600 text-slate-200"><i class="fa-solid fa-chevron-right"></i></button>
+                <div></div>
+                <button id="btnDown" class="bg-slate-800 border border-slate-700 rounded-lg flex items-center justify-center active:bg-blue-600 text-slate-200"><i class="fa-solid fa-chevron-down"></i></button>
+                <div></div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex gap-2">
+                <button id="btnSprint" class="w-14 h-14 bg-amber-600/80 border border-amber-500 rounded-full flex flex-col items-center justify-center active:bg-amber-500 text-white font-bold text-xs shadow-lg">
+                    <i class="fa-solid fa-bolt text-sm"></i> Lari
+                </button>
+                <button id="btnAction" class="w-16 h-16 bg-blue-600 border border-blue-400 rounded-full flex flex-col items-center justify-center active:bg-blue-400 text-white font-bold text-xs shadow-lg">
+                    <i class="fa-solid fa-handcuffs text-lg"></i> Tangkap
+                </button>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Game Logic Engine -->
+    <script>
+        // ==========================================
+        // GAME CONFIG & STATE MANAGEMENT
+        // ==========================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Responsive Canvas Setup
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Sound Effects Engine using Tone.js
+        const Sound = {
+            synth: new Tone.Synth().toDestination(),
+            polySynth: new Tone.PolySynth().toDestination(),
+            
+            siren() {
+                try {
+                    const now = Tone.now();
+                    this.synth.triggerAttackRelease("C5", "8n", now);
+                    this.synth.triggerAttackRelease("G4", "8n", now + 0.15);
+                } catch(e){}
+            },
+            catch() {
+                try {
+                    this.polySynth.triggerAttackRelease(["C4", "E4", "G4", "C5"], "8n");
+                } catch(e){}
+            },
+            sprint() {
+                try {
+                    this.synth.triggerAttackRelease("E3", "16n");
+                } catch(e){}
+            },
+            gameOver() {
+                try {
+                    this.polySynth.triggerAttackRelease(["C3", "Eb3", "G3"], "4n");
+                } catch(e){}
+            }
+        };
+
+        // Game Variables
+        let isGameRunning = false;
+        let selectedCaseIndex = 0;
+        let score = 0;
+        let catches = 0;
+        let timeRemaining = 60;
+        let gameTimer = null;
+        let animationFrameId = null;
+
+        // Player & Game Objects
+        let player;
+        let criminals = [];
+        let obstacles = [];
+        let particles = [];
+        let powerups = [];
+
+        // Input Tracking
+        const keys = {
+            Up: false,
+            Down: false,
+            Left: false,
+            Right: false,
+            Sprint: false,
+            Catch: false
+        };
+
+        // Cases Definition
+        const cases = [
+            {
+                name: "Ragut Beg Tangan",
+                targetCatches: 5,
+                criminalSpeed: 2.2,
+                timeLimit: 60,
+                color: "#f59e0b",
+                desc: "Tangkap peragut bersiri di sekitar kawasan perumahan!"
+            },
+            {
+                name: "Rompakan Bank",
+                targetCatches: 7,
+                criminalSpeed: 2.8,
+                timeLimit: 50,
+                color: "#ef4444",
+                desc: "Perompak bersenjata melarikan diri dari bank utama!"
+            },
+            {
+                name: "Jenayah Siber",
+                targetCatches: 10,
+                criminalSpeed: 3.4,
+                timeLimit: 45,
+                color: "#a855f7",
+                desc: "Penggodam elit cuba memadam data polis! Tangkap mereka segera!"
+            },
+            {
+                name: "Seludup Haram",
+                targetCatches: 12,
+                criminalSpeed: 4.0,
+                timeLimit: 40,
+                color: "#10b981",
+                desc: "Penyeludup barangan terlarang bergerak pantas di pelabuhan!"
+            }
+        ];
+
+        // ==========================================
+        // CLASS DEFINITIONS (Player, Criminal, Obstacles)
+        // ==========================================
+        class Player {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.radius = 18;
+                this.baseSpeed = 3.5;
+                this.speed = this.baseSpeed;
+                this.stamina = 100;
+                this.isSprinting = false;
+                this.angle = 0;
+                this.catchRadius = 45;
+                this.isCatching = false;
+            }
+
+            update() {
+                // Stamina & Sprint Logic
+                if (keys.Sprint && this.stamina > 5) {
+                    this.isSprinting = true;
+                    this.speed = this.baseSpeed * 1.7;
+                    this.stamina -= 1.2;
+                } else {
+                    this.isSprinting = false;
+                    this.speed = this.baseSpeed;
+                    if (this.stamina < 100) this.stamina += 0.4;
+                }
+
+                // Movement Calculation
+                let dx = 0;
+                let dy = 0;
+
+                if (keys.Up) dy -= 1;
+                if (keys.Down) dy += 1;
+                if (keys.Left) dx -= 1;
+                if (keys.Right) dx += 1;
+
+                // Normalize Diagonal Speed
+                if (dx !== 0 && dy !== 0) {
+                    dx *= 0.7071;
+                    dy *= 0.7071;
+                }
+
+                // New proposed position
+                let newX = this.x + dx * this.speed;
+                let newY = this.y + dy * this.speed;
+
+                // Boundary & Obstacle Collisions
+                if (newX - this.radius > 0 && newX + this.radius < canvas.width) {
+                    if (!checkObstacleCollision(newX, this.y, this.radius)) this.x = newX;
+                }
+                if (newY - this.radius > 0 && newY + this.radius < canvas.height) {
+                    if (!checkObstacleCollision(this.x, newY, this.radius)) this.y = newY;
+                }
+
+                // Calculate Rotation Angle
+                if (dx !== 0 || dy !== 0) {
+                    this.angle = Math.atan2(dy, dx);
+                }
+
+                // Handle Catch Action
+                if (keys.Catch) {
+                    this.isCatching = true;
+                    setTimeout(() => this.isCatching = false, 200);
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                // Catch Aura Effect
+                if (this.isCatching) {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.catchRadius, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(59, 130, 246, 0.3)';
+                    ctx.strokeStyle = '#3b82f6';
+                    ctx.lineWidth = 2;
+                    ctx.fill();
+                    ctx.stroke();
+                }
+
+                ctx.rotate(this.angle);
+
+                // Police Officer Body
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#1e40af'; // Police Blue
+                ctx.fill();
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#60a5fa';
+                ctx.stroke();
+
+                // Police Cap/Badge Marker
+                ctx.beginPath();
+                ctx.arc(this.radius * 0.5, 0, 6, 0, Math.PI * 2);
+                ctx.fillStyle = '#fbbf24'; // Gold Badge
+                ctx.fill();
+
+                // Hands / Flashlight Direction
+                ctx.fillStyle = '#93c5fd';
+                ctx.beginPath();
+                ctx.arc(10, -12, 4, 0, Math.PI * 2);
+                ctx.arc(10, 12, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+
+                // Stamina Bar above player
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(this.x - 20, this.y - this.radius - 12, 40, 5);
+                ctx.fillStyle = this.stamina > 30 ? '#10b981' : '#ef4444';
+                ctx.fillRect(this.x - 20, this.y - this.radius - 12, (this.stamina / 100) * 40, 5);
+            }
+        }
+
+        class Criminal {
+            constructor(speedMultiplier) {
+                this.radius = 16;
+                this.respawn();
+                this.speed = (Math.random() * 1.2 + 1.8) * speedMultiplier;
+                this.changeDirTimer = 0;
+                this.vx = 0;
+                this.vy = 0;
+                this.typeColor = cases[selectedCaseIndex].color;
+            }
+
+            respawn() {
+                // Spawn away from player
+                let validSpawn = false;
+                while (!validSpawn) {
+                    this.x = Math.random() * (canvas.width - 100) + 50;
+                    this.y = Math.random() * (canvas.height - 100) + 50;
+                    const distToPlayer = Math.hypot(this.x - player.x, this.y - player.y);
+                    if (distToPlayer > 200 && !checkObstacleCollision(this.x, this.y, this.radius)) {
+                        validSpawn = true;
+                    }
+                }
+            }
+
+            update() {
+                // AI Movement: Run away from player if near, otherwise wander
+                const distToPlayer = Math.hypot(this.x - player.x, this.y - player.y);
+
+                if (distToPlayer < 180) {
+                    // Evade Police Player
+                    const angle = Math.atan2(this.y - player.y, this.x - player.x);
+                    this.vx = Math.cos(angle) * this.speed;
+                    this.vy = Math.sin(angle) * this.speed;
+                } else {
+                    // Random Wandering
+                    this.changeDirTimer--;
+                    if (this.changeDirTimer <= 0) {
+                        const randomAngle = Math.random() * Math.PI * 2;
+                        this.vx = Math.cos(randomAngle) * (this.speed * 0.6);
+                        this.vy = Math.sin(randomAngle) * (this.speed * 0.6);
+                        this.changeDirTimer = Math.floor(Math.random() * 60 + 30);
+                    }
+                }
+
+                // Apply movement with wall and obstacle checks
+                let nextX = this.x + this.vx;
+                let nextY = this.y + this.vy;
+
+                if (nextX - this.radius > 0 && nextX + this.radius < canvas.width && !checkObstacleCollision(nextX, this.y, this.radius)) {
+                    this.x = nextX;
+                } else {
+                    this.vx *= -1;
+                }
+
+                if (nextY - this.radius > 0 && nextY + this.radius < canvas.height && !checkObstacleCollision(this.x, nextY, this.radius)) {
+                    this.y = nextY;
+                } else {
+                    this.vy *= -1;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                // Criminal Body
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#1f2937'; // Dark jacket
+                ctx.fill();
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = this.typeColor;
+                ctx.stroke();
+
+                // Mask / Criminal Feature Icon
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(-8, -4, 16, 8); // Eye Mask
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(-5, -2, 4, 4);
+                ctx.fillRect(1, -2, 4, 4);
+
+                ctx.restore();
+            }
+        }
+
+        class Obstacle {
+            constructor(x, y, w, h, label) {
+                this.x = x;
+                this.y = y;
+                this.w = w;
+                this.h = h;
+                this.label = label;
+            }
+
+            draw() {
+                ctx.fillStyle = '#374151';
+                ctx.strokeStyle = '#4b5563';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.roundRect(this.x, this.y, this.w, this.h, 8);
+                ctx.fill();
+                ctx.stroke();
+
+                // Building / Obstacle Icon Text
+                ctx.fillStyle = '#9ca3af';
+                ctx.font = '12px Rajdhani';
+                ctx.textAlign = 'center';
+                ctx.fillText(this.label, this.x + this.w / 2, this.y + this.h / 2 + 4);
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.radius = Math.random() * 4 + 2;
+                this.vx = (Math.random() - 0.5) * 6;
+                this.vy = (Math.random() - 0.5) * 6;
+                this.alpha = 1;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= 0.03;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.alpha);
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // ==========================================
+        // COLLISION & MAP HELPER FUNCTIONS
+        // ==========================================
+        function checkObstacleCollision(circleX, circleY, radius) {
+            for (let obs of obstacles) {
+                let closestX = Math.max(obs.x, Math.min(circleX, obs.x + obs.w));
+                let closestY = Math.max(obs.y, Math.min(circleY, obs.y + obs.h));
+
+                let distanceX = circleX - closestX;
+                let distanceY = circleY - closestY;
+
+                let distanceSquared = (distanceX * distanceX) + (distanceY * distanceY);
+                if (distanceSquared < (radius * radius)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function createMapObstacles() {
+            obstacles = [];
+            const w = canvas.width;
+            const h = canvas.height;
+
+            // Generate map layout with blocks/buildings based on screen size
+            obstacles.push(new Obstacle(w * 0.15, h * 0.2, w * 0.2, h * 0.15, "BANGUNAN"));
+            obstacles.push(new Obstacle(w * 0.65, h * 0.2, w * 0.2, h * 0.15, "BANK"));
+            obstacles.push(new Obstacle(w * 0.25, h * 0.65, w * 0.2, h * 0.18, "TAMAN"));
+            obstacles.push(new Obstacle(w * 0.6, h * 0.65, w * 0.25, h * 0.15, "KEDAI"));
+        }
+
+        function createParticles(x, y, color, count = 15) {
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        // ==========================================
+        // INPUT CONTROLLERS & EVENT LISTENERS
+        // ==========================================
+        function setupControls() {
+            // Keyboard Controls
+            window.addEventListener('keydown', (e) => {
+                if (!isGameRunning) return;
+                switch (e.key.toLowerCase()) {
+                    case 'w': case 'arrowup': keys.Up = true; break;
+                    case 's': case 'arrowdown': keys.Down = true; break;
+                    case 'a': case 'arrowleft': keys.Left = true; break;
+                    case 'd': case 'arrowright': keys.Right = true; break;
+                    case 'shift': keys.Sprint = true; break;
+                    case ' ': 
+                        if (!keys.Catch) triggerCatchAction();
+                        keys.Catch = true; 
+                        break;
+                }
+            });
+
+            window.addEventListener('keyup', (e) => {
+                switch (e.key.toLowerCase()) {
+                    case 'w': case 'arrowup': keys.Up = false; break;
+                    case 's': case 'arrowdown': keys.Down = false; break;
+                    case 'a': case 'arrowleft': keys.Left = false; break;
+                    case 'd': case 'arrowright': keys.Right = false; break;
+                    case 'shift': keys.Sprint = false; break;
+                    case ' ': keys.Catch = false; break;
+                }
+            });
+
+            // Touch Controls Mapping
+            const bindTouch = (id, keyName) => {
+                const btn = document.getElementById(id);
+                if (!btn) return;
+                
+                const startHandler = (e) => {
+                    e.preventDefault();
+                    if (keyName === 'Catch' && !keys.Catch) triggerCatchAction();
+                    keys[keyName] = true;
+                };
+                const endHandler = (e) => {
+                    e.preventDefault();
+                    keys[keyName] = false;
+                };
+
+                btn.addEventListener('touchstart', startHandler);
+                btn.addEventListener('touchend', endHandler);
+                btn.addEventListener('mousedown', startHandler);
+                btn.addEventListener('mouseup', endHandler);
+            };
+
+            bindTouch('btnUp', 'Up');
+            bindTouch('btnDown', 'Down');
+            bindTouch('btnLeft', 'Left');
+            bindTouch('btnRight', 'Right');
+            bindTouch('btnSprint', 'Sprint');
+            bindTouch('btnAction', 'Catch');
+        }
+
+        function triggerCatchAction() {
+            player.isCatching = true;
+            Sound.siren();
+            
+            // Check if any criminal is within catch range
+            criminals.forEach((criminal, index) => {
+                const dist = Math.hypot(player.x - criminal.x, player.y - criminal.y);
+                if (dist <= player.catchRadius + criminal.radius) {
+                    // Successful Arrest
+                    catches++;
+                    score += 150 + (timeRemaining * 2);
+                    Sound.catch();
+                    createParticles(criminal.x, criminal.y, '#3b82f6', 20);
+                    
+                    // Respawn Caught Criminal
+                    criminal.respawn();
+                    
+                    updateHUD();
+
+                    // Check Win Condition
+                    const currentCase = cases[selectedCaseIndex];
+                    if (catches >= currentCase.targetCatches) {
+                        endGame(true);
+                    }
+                }
+            });
+
+            setTimeout(() => player.isCatching = false, 250);
+        }
+
+        // ==========================================
+        // GAME FLOW MANAGEMENT
+        // ==========================================
+        function selectCase(index) {
+            selectedCaseIndex = index;
+            document.querySelectorAll('.case-btn').forEach((btn, i) => {
+                if (i === index) {
+                    btn.classList.add('ring-2', 'ring-blue-500', 'bg-blue-900/40');
+                } else {
+                    btn.classList.remove('ring-2', 'ring-blue-500', 'bg-blue-900/40');
+                }
+            });
+        }
+
+        function startGame() {
+            // Audio Context Activation
+            Tone.start();
+
+            const currentCase = cases[selectedCaseIndex];
+            
+            // Reset Game Variables
+            score = 0;
+            catches = 0;
+            timeRemaining = currentCase.timeLimit;
+            isGameRunning = true;
+
+            // UI Adjustments
+            document.getElementById('startOverlay').classList.add('hidden');
+            document.getElementById('endOverlay').classList.add('hidden');
+            updateHUD();
+
+            // Setup Map & Player
+            resizeCanvas();
+            createMapObstacles();
+            player = new Player(canvas.width / 2, canvas.height / 2);
+
+            // Populate Criminals
+            criminals = [];
+            for (let i = 0; i < 3; i++) {
+                criminals.push(new Criminal(currentCase.criminalSpeed));
+            }
+
+            particles = [];
+
+            // Timer Loop
+            clearInterval(gameTimer);
+            gameTimer = setInterval(() => {
+                if (!isGameRunning) return;
+                timeRemaining--;
+                document.getElementById('timeDisplay').innerText = `${timeRemaining}s`;
+
+                if (timeRemaining <= 0) {
+                    endGame(false);
+                }
+            }, 1000);
+
+            // Start Main Game Loop
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            gameLoop();
+        }
+
+        function updateHUD() {
+            const currentCase = cases[selectedCaseIndex];
+            document.getElementById('scoreDisplay').innerText = score;
+            document.getElementById('catchesDisplay').innerText = `${catches}/${currentCase.targetCatches}`;
+            document.getElementById('timeDisplay').innerText = `${timeRemaining}s`;
+
+            // Dynamic Rank Progression based on Score
+            let rank = "Konstabel";
+            if (score >= 1200) rank = "Ketua Polis Negara";
+            else if (score >= 800) rank = "Superintenden";
+            else if (score >= 500) rank = "Inspektor";
+            else if (score >= 250) rank = "Koperal";
+
+            document.getElementById('rankBadge').innerText = `Pangkat: ${rank}`;
+        }
+
+        function endGame(isVictory) {
+            isGameRunning = false;
+            clearInterval(gameTimer);
+
+            const endOverlay = document.getElementById('endOverlay');
+            const endIcon = document.getElementById('endIcon');
+            const endTitle = document.getElementById('endTitle');
+            const endDesc = document.getElementById('endDesc');
+
+            endOverlay.classList.remove('hidden');
+
+            document.getElementById('finalScore').innerText = score;
+            document.getElementById('finalCatches').innerText = catches;
+            document.getElementById('finalRank').innerText = document.getElementById('rankBadge').innerText.replace('Pangkat: ', '');
+
+            if (isVictory) {
+                Sound.catch();
+                endIcon.className = "w-20 h-20 rounded-full flex items-center justify-center text-4xl mb-4 border-2 bg-emerald-500/20 border-emerald-500 text-emerald-400";
+                endIcon.innerHTML = `<i class="fa-solid fa-trophy"></i>`;
+                endTitle.innerText = "Misi Berjaya!";
+                endTitle.className = "text-3xl font-black mb-2 uppercase text-emerald-400";
+                endDesc.innerText = `Syabas! Anda telah berjaya menumpaskan penjahat bagi ${cases[selectedCaseIndex].name} dan menjaga keamanan bandar!`;
+            } else {
+                Sound.gameOver();
+                endIcon.className = "w-20 h-20 rounded-full flex items-center justify-center text-4xl mb-4 border-2 bg-rose-500/20 border-rose-500 text-rose-400";
+                endIcon.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i>`;
+                endTitle.innerText = "Masa Tamat!";
+                endTitle.className = "text-3xl font-black mb-2 uppercase text-rose-400";
+                endDesc.innerText = "Penjahat telah melarikan diri! Sila cuba lagi untuk membanteras kes ini.";
+            }
+        }
+
+        function resetToMenu() {
+            document.getElementById('endOverlay').classList.add('hidden');
+            document.getElementById('startOverlay').classList.remove('hidden');
+        }
+
+        // ==========================================
+        // MAIN GAME RENDER LOOP
+        // ==========================================
+        function gameLoop() {
+            if (!isGameRunning) return;
+
+            // Clear Background
+            ctx.fillStyle = '#111827';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Road Grid / Visual Elements
+            ctx.strokeStyle = '#1f2937';
+            ctx.lineWidth = 1;
+            const gridSize = 40;
+            for (let x = 0; x < canvas.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            // Draw Obstacles
+            obstacles.forEach(obs => obs.draw());
+
+            // Update & Draw Criminals
+            criminals.forEach(criminal => {
+                criminal.update();
+                criminal.draw();
+            });
+
+            // Update & Draw Player
+            player.update();
+            player.draw();
+
+            // Handle FX Particles
+            particles.forEach((p, index) => {
+                p.update();
+                p.draw();
+                if (p.alpha <= 0) particles.splice(index, 1);
+            });
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // Initialize Menu State
+        selectCase(0);
+        setupControls();
+    </script>
+</body>
+</html>
